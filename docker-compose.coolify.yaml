@@ -9,6 +9,10 @@
 #    REDIS_PASSWORD:      openssl rand -hex 32
 #    RUSTFS_ACCESS_KEY:   openssl rand -hex 16
 #    RUSTFS_SECRET_KEY:   openssl rand -hex 32
+#    Optional (outbound email + signup lock, carried over from the old stack):
+#    MAILER_SENDER_EMAIL, SMTP_ADDRESS, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
+#    SMTP_DOMAIN, SMTP_AUTHENTICATION, SMTP_ENABLE_STARTTLS_AUTO, SMTP_TLS,
+#    ENABLE_ACCOUNT_SIGNUP=false.
 # 4. Point the three DNS names to your Coolify server and attach domains in its UI:
 #    chat.company.com    -> rails:3000  (https://chat.company.com:3000)
 #    files.company.com   -> rustfs:9000 (https://files.company.com:9000)
@@ -53,6 +57,16 @@ x-chatwoot-base: &chatwoot-base
     STORAGE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
     STORAGE_REGION: us-east-1
     STORAGE_FORCE_PATH_STYLE: "true"
+    MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL:-}
+    SMTP_ADDRESS: ${SMTP_ADDRESS:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_USERNAME: ${SMTP_USERNAME:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_DOMAIN: ${SMTP_DOMAIN:-}
+    SMTP_AUTHENTICATION: ${SMTP_AUTHENTICATION:-login}
+    SMTP_ENABLE_STARTTLS_AUTO: ${SMTP_ENABLE_STARTTLS_AUTO:-true}
+    SMTP_TLS: ${SMTP_TLS:-false}
+    ENABLE_ACCOUNT_SIGNUP: ${ENABLE_ACCOUNT_SIGNUP:-false}
 
 services:
   prepare:
