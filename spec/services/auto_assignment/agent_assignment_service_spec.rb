@@ -44,5 +44,14 @@ RSpec.describe AutoAssignment::AgentAssignmentService do
       expect(described_class.new(conversation: conversation,
                                  allowed_agent_ids: inbox_members.map(&:user_id).map(&:to_s)).find_assignee).to eq(inbox_members[4].user)
     end
+
+    it 'falls back to any allowed agent when no agent is online' do
+      allow(OnlineStatusTracker).to receive(:get_available_users).and_return({})
+
+      assignee = described_class.new(conversation: conversation,
+                                     allowed_agent_ids: inbox_members.map(&:user_id).map(&:to_s)).find_assignee
+
+      expect(inbox_members.map(&:user)).to include(assignee)
+    end
   end
 end

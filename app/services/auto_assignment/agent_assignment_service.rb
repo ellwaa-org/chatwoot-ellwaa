@@ -68,7 +68,12 @@ class AutoAssignment::AgentAssignmentService
     # Hence taking an intersection of online agents and allowed member ids
 
     # the online user ids are string, since its from redis, allowed member ids are integer, since its from active record
-    @allowed_online_agent_ids ||= online_agent_ids & allowed_agent_ids&.map(&:to_s)
+    online_ids = online_agent_ids & allowed_agent_ids&.map(&:to_s)
+    return online_ids if online_ids.present?
+
+    # No agent is online: fall back to all allowed agents so leads always get
+    # an owner instead of piling up unassigned.
+    allowed_agent_ids&.map(&:to_s) || []
   end
 
   def round_robin_manage_service
