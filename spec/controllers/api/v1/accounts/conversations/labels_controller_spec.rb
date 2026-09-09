@@ -21,6 +21,7 @@ RSpec.describe 'Conversation Label API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 
@@ -57,6 +58,7 @@ RSpec.describe 'Conversation Label API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         conversation.update_labels('label1, label2')
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end

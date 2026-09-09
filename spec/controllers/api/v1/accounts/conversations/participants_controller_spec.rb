@@ -7,6 +7,7 @@ RSpec.describe 'Conversation Participants API', type: :request do
   let(:foreign_participant) { create(:user, account: create(:account), role: :agent) }
 
   before do
+    conversation.update!(assignee: agent)
     create(:inbox_member, inbox: conversation.inbox, user: agent)
   end
 

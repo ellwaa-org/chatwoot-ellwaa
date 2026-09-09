@@ -13,8 +13,9 @@ class ConversationPolicy < ApplicationPolicy
 
   private
 
+  # inbox_access? and team_access? are consumed by Enterprise::ConversationPolicy
   def agent_can_view_conversation?
-    inbox_access? || team_access?
+    assigned_to_user?
   end
 
   def administrator?

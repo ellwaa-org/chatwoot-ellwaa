@@ -186,6 +186,15 @@ class Contact < ApplicationRecord
     where("contacts.email <> '' OR contacts.phone_number <> '' OR contacts.identifier <> ''")
   end
 
+  # Agents only see contacts whose conversations are assigned to them;
+  # administrators and Enterprise custom roles (contact_manage) see everything.
+  def self.visible_to(user, account)
+    account_user = account.account_users.find_by(user_id: user.id)
+    return all if account_user&.administrator? || account_user&.custom_role_id.present?
+
+    where(id: Conversation.where(account_id: account.id, assignee_id: user.id).select(:contact_id))
+  end
+
   def discard_invalid_attrs
     phone_number_format
     email_format

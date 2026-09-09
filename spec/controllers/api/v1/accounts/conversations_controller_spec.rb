@@ -17,6 +17,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:conversation) { create(:conversation, account: account) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -47,13 +48,14 @@ RSpec.describe 'Conversations API', type: :request do
       end
 
       it 'returns unattended conversations' do
-        attended_conversation = create(:conversation, account: account, first_reply_created_at: Time.now.utc)
+        agent_1 = create(:user, account: account, role: :agent)
+        attended_conversation = create(:conversation, account: account, assignee: agent_1, first_reply_created_at: Time.now.utc)
         # to ensure that waiting since value is populated
         create(:message, message_type: :outgoing, conversation: attended_conversation, account: account)
-        unattended_conversation_no_first_reply = create(:conversation, account: account, first_reply_created_at: nil)
-        unattended_conversation_waiting_since = create(:conversation, account: account, first_reply_created_at: Time.now.utc)
+        unattended_conversation_no_first_reply = create(:conversation, account: account, assignee: agent_1, first_reply_created_at: nil)
+        unattended_conversation_waiting_since = create(:conversation, account: account, assignee: agent_1,
+                                                                     first_reply_created_at: Time.now.utc)
 
-        agent_1 = create(:user, account: account, role: :agent)
         create(:inbox_member, user: agent_1, inbox: attended_conversation.inbox)
         create(:inbox_member, user: agent_1, inbox: unattended_conversation_no_first_reply.inbox)
         create(:inbox_member, user: agent_1, inbox: unattended_conversation_waiting_since.inbox)
@@ -85,6 +87,7 @@ RSpec.describe 'Conversations API', type: :request do
 
       before do
         conversation = create(:conversation, account: account)
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -132,7 +135,7 @@ RSpec.describe 'Conversations API', type: :request do
         end
 
         it 'returns unread conversation counts scoped to the signed-in user' do
-          create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title])
+          create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], assignee: agent)
           create_unread_conversation(account: account, inbox: hidden_inbox, labels: [label.title])
 
           get "/api/v1/accounts/#{account.id}/conversations/unread_counts",
@@ -149,7 +152,7 @@ RSpec.describe 'Conversations API', type: :request do
         end
 
         it 'returns unread team conversation counts scoped to the signed-in user' do
-          create_unread_conversation(account: account, inbox: visible_inbox, team: team)
+          create_unread_conversation(account: account, inbox: visible_inbox, team: team, assignee: agent)
           create_unread_conversation(account: account, inbox: hidden_inbox, team: team)
 
           get "/api/v1/accounts/#{account.id}/conversations/unread_counts",
@@ -165,7 +168,7 @@ RSpec.describe 'Conversations API', type: :request do
           allow(Conversations::UnreadCounts::FilteredCountInstrumentation).to receive(:summarize_request) do |**_attributes, &block|
             block.call
           end
-          mentioned = create_unread_conversation(account: account, inbox: visible_inbox)
+          mentioned = create_unread_conversation(account: account, inbox: visible_inbox, assignee: agent)
           create(:mention, account: account, conversation: mentioned, user: agent)
 
           get "/api/v1/accounts/#{account.id}/conversations/unread_counts",
@@ -210,6 +213,7 @@ RSpec.describe 'Conversations API', type: :request do
         conversation = create(:conversation, account: account)
         create(:message, conversation: conversation, account: account, content: 'test1')
         create(:message, conversation: conversation, account: account, content: 'test2')
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -243,6 +247,7 @@ RSpec.describe 'Conversations API', type: :request do
         conversation = create(:conversation, account: account)
         create(:message, conversation: conversation, account: account, content: 'test1')
         create(:message, conversation: conversation, account: account, content: 'test2')
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -334,6 +339,7 @@ RSpec.describe 'Conversations API', type: :request do
       end
 
       it 'shows the conversation if you are an agent with access to inbox' do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
         get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
             headers: agent.create_new_auth_token,
@@ -399,6 +405,7 @@ RSpec.describe 'Conversations API', type: :request do
       end
 
       it 'updates the conversation if you are an agent with access to inbox' do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
         patch "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
               params: params,
@@ -577,6 +584,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:administrator) { create(:user, account: account, role: :administrator) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -710,6 +718,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:administrator) { create(:user, account: account, role: :administrator) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -772,6 +781,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -847,6 +857,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1048,6 +1059,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
         create(:message, conversation: conversation, account: account, inbox: conversation.inbox, content: 'Hello', message_type: 'incoming')
       end
@@ -1146,6 +1158,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1176,6 +1189,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1206,6 +1220,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:params) { { email: 'test@test.com' } }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1249,6 +1264,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:valid_params) { { custom_attributes: custom_attributes } }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1325,6 +1341,7 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 
@@ -1408,6 +1425,7 @@ RSpec.describe 'Conversations API', type: :request do
 
     context 'when it is an authenticated agent' do
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, user: agent, inbox: conversation.inbox)
       end
 

@@ -24,7 +24,7 @@ class ContactPolicy < ApplicationPolicy
   end
 
   def update?
-    true
+    contact_accessible?
   end
 
   def contactable_inboxes?
@@ -36,7 +36,7 @@ class ContactPolicy < ApplicationPolicy
   end
 
   def show?
-    true
+    contact_accessible?
   end
 
   def create?
@@ -49,6 +49,18 @@ class ContactPolicy < ApplicationPolicy
 
   def destroy?
     @account_user.administrator?
+  end
+
+  private
+
+  # Agents can only open/edit contacts whose conversations are assigned to
+  # them; administrators and Enterprise custom roles (contact_manage) are
+  # unrestricted.
+  def contact_accessible?
+    return true if @account_user.administrator?
+    return true if @account_user.permissions.include?('contact_manage')
+
+    record.conversations.exists?(assignee_id: @user.id)
   end
 end
 

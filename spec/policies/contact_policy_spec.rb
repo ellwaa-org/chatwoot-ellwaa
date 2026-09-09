@@ -11,16 +11,33 @@ RSpec.describe ContactPolicy, type: :policy do
   let(:agent) { create(:user, account: account) }
   let(:contact) { create(:contact) }
 
-  let(:administrator_context) { { user: administrator, account: account, account_user: account.account_users.first } }
-  let(:agent_context) { { user: agent, account: account, account_user: account.account_users.first } }
+  let(:administrator_context) { { user: administrator, account: account, account_user: administrator.account_users.find_by(account: account) } }
+  let(:agent_context) { { user: agent, account: account, account_user: agent.account_users.find_by(account: account) } }
 
-  permissions :index?, :show?, :update? do
+  permissions :index? do
     context 'when administrator' do
       it { expect(contact_policy).to permit(administrator_context, contact) }
     end
 
     context 'when agent' do
       it { expect(contact_policy).to permit(agent_context, contact) }
+    end
+  end
+
+  permissions :show?, :update? do
+    context 'when administrator' do
+      it { expect(contact_policy).to permit(administrator_context, contact) }
+    end
+
+    context 'when the agent has a conversation assigned' do
+      let(:assigned_contact) { create(:contact, account: account) }
+      let!(:conversation) { create(:conversation, account: account, contact: assigned_contact, assignee: agent) }
+
+      it { expect(contact_policy).to permit(agent_context, assigned_contact) }
+    end
+
+    context 'when the agent has no assigned conversation' do
+      it { expect(contact_policy).not_to permit(agent_context, contact) }
     end
   end
 

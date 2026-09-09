@@ -4,7 +4,7 @@ describe Contacts::FilterService do
   subject(:filter_service) { described_class }
 
   let!(:account) { create(:account) }
-  let!(:first_user) { create(:user, account: account) }
+  let!(:first_user) { create(:user, :administrator, account: account) }
   let!(:second_user) { create(:user, account: account) }
   let!(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
   let!(:en_contact) do
@@ -66,6 +66,16 @@ describe Contacts::FilterService do
       en_contact.update!(custom_attributes: { contact_additional_information: 'test custom data' })
       el_contact.update!(custom_attributes: { contact_additional_information: 'test custom data', customer_type: 'platinum' })
       cs_contact.update!(custom_attributes: { customer_type: 'platinum', signed_in_at: '2022-01-19', lifetime_value: '120.50' })
+    end
+
+    context 'when the user is a plain agent' do
+      it 'returns only contacts whose conversations are assigned to the agent' do
+        create(:conversation, account: account, inbox: inbox, assignee: second_user, contact: cs_contact)
+
+        result = filter_service.new(account, second_user, { payload: [] }).perform
+
+        expect(result[:contacts]).to contain_exactly(cs_contact)
+      end
     end
 
     context 'with standard attributes - name' do

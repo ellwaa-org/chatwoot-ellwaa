@@ -19,6 +19,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 
@@ -196,6 +197,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 
@@ -226,6 +228,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 
@@ -260,6 +263,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 
@@ -287,6 +291,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        message.conversation.update!(assignee: agent)
         create(:inbox_member, inbox: message.conversation.inbox, user: agent)
       end
 
@@ -305,6 +310,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
 
       before do
+        message.conversation.update!(assignee: agent)
         create(:inbox_member, inbox: message.conversation.inbox, user: agent)
       end
 
@@ -351,7 +357,10 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
 
       context 'when agent has API inbox' do
-        before { create(:inbox_member, inbox: api_inbox, user: agent) }
+        before do
+          conversation.update!(assignee: agent)
+          create(:inbox_member, inbox: api_inbox, user: agent)
+        end
 
         it 'uses StatusUpdateService to perform status update' do
           service = instance_double(Messages::StatusUpdateService)

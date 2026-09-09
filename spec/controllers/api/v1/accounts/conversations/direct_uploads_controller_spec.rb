@@ -6,7 +6,7 @@ RSpec.describe '/api/v1/accounts/:account_id/conversations/:conversation_id/dire
   let(:agent) { create(:user, account: account, role: :agent) }
   let(:contact) { create(:contact, account: account, email: nil) }
   let(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: web_widget.inbox) }
-  let(:conversation) { create(:conversation, contact: contact, account: account, inbox: web_widget.inbox, contact_inbox: contact_inbox) }
+  let(:conversation) { create(:conversation, contact: contact, account: account, inbox: web_widget.inbox, contact_inbox: contact_inbox, assignee: agent) }
   let(:blob_params) do
     {
       blob: {

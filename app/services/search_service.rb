@@ -31,8 +31,8 @@ class SearchService
   end
 
   def filter_conversations
-    conversations_query = current_account.conversations.where(inbox_id: accessable_inbox_ids)
-                                         .joins('INNER JOIN contacts ON conversations.contact_id = contacts.id')
+    conversations_query = accessible_conversations
+                                       .joins('INNER JOIN contacts ON conversations.contact_id = contacts.id')
                                          .where("cast(conversations.display_id as text) ILIKE :search OR contacts.name ILIKE :search OR contacts.email
                             ILIKE :search OR contacts.phone_number ILIKE :search OR contacts.identifier ILIKE :search", search: "%#{search_query}%")
 
@@ -104,6 +104,14 @@ class SearchService
               .per(15)
   end
 
+  def accessible_conversations
+    @accessible_conversations ||= Conversations::PermissionFilterService.new(
+      current_account.conversations,
+      current_user,
+      current_account
+    ).perform
+  end
+
   def message_base_query
     query = current_account.messages.where('created_at >= ?', 3.months.ago)
     query = query.where(inbox_id: accessable_inbox_ids) unless should_skip_inbox_filtering?
@@ -171,7 +179,7 @@ class SearchService
 
     @contacts = contacts_query.resolved_contacts(
       use_crm_v2: current_account.feature_enabled?('crm_v2')
-    ).order_on_last_activity_at('desc').page(params[:page]).per(15)
+    ).visible_to(current_user, current_account).order_on_last_activity_at('desc').page(params[:page]).per(15)
   end
 
   def filter_articles

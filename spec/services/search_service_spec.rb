@@ -5,10 +5,10 @@ describe SearchService do
 
   let(:search_type) { 'all' }
   let!(:account) { create(:account) }
-  let!(:user) { create(:user, account: account) }
+  let!(:user) { create(:user, :administrator, account: account) }
   let!(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
   let!(:harry) { create(:contact, name: 'Harry Potter', email: 'test@test.com', account_id: account.id) }
-  let!(:conversation) { create(:conversation, contact: harry, inbox: inbox, account: account) }
+  let!(:conversation) { create(:conversation, contact: harry, inbox: inbox, account: account, assignee: user) }
   let!(:message) { create(:message, account: account, inbox: inbox, content: 'Harry Potter is a wizard') }
   let!(:portal) { create(:portal, account: account) }
   let(:article) do
@@ -264,7 +264,7 @@ describe SearchService do
         # random messages in another inbox
         random = create(:contact, account_id: account.id)
         create(:conversation, contact: random, inbox: inbox, account: account)
-        conv2 = create(:conversation, contact: harry, inbox: inbox, account: account)
+        conv2 = create(:conversation, contact: harry, inbox: inbox, account: account, assignee: user)
         params = { q: 'Harry' }
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
         expect(search.perform[:conversations].map(&:id)).to eq([conv2.id, conversation.id])
@@ -272,7 +272,7 @@ describe SearchService do
 
       it 'searches across conversations with display id' do
         random = create(:contact, account_id: account.id, name: 'random', email: 'random@random.test', identifier: 'random')
-        new_converstion = create(:conversation, contact: random, inbox: inbox, account: account)
+        new_converstion = create(:conversation, contact: random, inbox: inbox, account: account, assignee: user)
         params = { q: new_converstion.display_id }
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
         expect(search.perform[:conversations].map(&:id)).to include new_converstion.id
@@ -336,8 +336,12 @@ describe SearchService do
     end
 
     context 'when filtering conversations with time caps', :opensearch do
-      let!(:old_conversation) { create(:conversation, contact: harry, inbox: inbox, account: account, last_activity_at: 100.days.ago) }
-      let!(:recent_conversation) { create(:conversation, contact: harry, inbox: inbox, account: account, last_activity_at: 1.day.ago) }
+      let!(:old_conversation) do
+        create(:conversation, contact: harry, inbox: inbox, account: account, assignee: user, last_activity_at: 100.days.ago)
+      end
+      let!(:recent_conversation) do
+        create(:conversation, contact: harry, inbox: inbox, account: account, assignee: user, last_activity_at: 1.day.ago)
+      end
 
       before do
         account.enable_features!('advanced_search')

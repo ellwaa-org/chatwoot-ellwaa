@@ -38,6 +38,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def show; end
 
   def create
+    # Agents only have access to conversations assigned to them, so default the
+    # assignee to the creator instead of leaving agent-created conversations stranded
+    params[:assignee_id] = Current.user.id if params[:assignee_id].blank? && Current.account_user&.agent?
+
     ActiveRecord::Base.transaction do
       @conversation = ConversationBuilder.new(params: params, contact_inbox: @contact_inbox).perform
       Messages::MessageBuilder.new(Current.user, @conversation, params[:message]).perform if params[:message].present?

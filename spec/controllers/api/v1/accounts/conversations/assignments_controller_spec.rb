@@ -36,6 +36,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
 
     context 'when it is an authenticated user with access to the inbox' do
       let(:agent) { create(:user, account: account, role: :agent) }
+      let(:administrator) { create(:user, account: account, role: :administrator) }
       let(:agent_bot) { create(:agent_bot, account: account) }
       let(:team) { create(:team, account: account) }
 
@@ -48,7 +49,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
 
         post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
              params: params,
-             headers: agent.create_new_auth_token,
+             headers: administrator.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
@@ -64,7 +65,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
 
         post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
              params: params,
-             headers: agent.create_new_auth_token,
+             headers: administrator.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
@@ -82,7 +83,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
 
         post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
              params: params,
-             headers: agent.create_new_auth_token,
+             headers: administrator.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
@@ -165,7 +166,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
       let(:team) { create(:team, account: account) }
 
       before do
-        conversation.update!(team: team)
+        conversation.update!(team: team, assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 

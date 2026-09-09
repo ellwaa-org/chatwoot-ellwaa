@@ -20,6 +20,7 @@ RSpec.describe 'Conversation Draft Messages API', type: :request do
       let(:message) { Faker::Lorem.paragraph }
 
       before do
+        conversation.update!(assignee: agent)
         create(:inbox_member, inbox: conversation.inbox, user: agent)
       end
 

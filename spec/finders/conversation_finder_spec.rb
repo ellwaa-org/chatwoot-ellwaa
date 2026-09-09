@@ -43,12 +43,13 @@ describe ConversationFinder do
         expect(result[:conversations].map(&:id)).to include(restricted_conversation.id)
       end
 
-      it 'returns conversation from inbox if agent is its member' do
+      it 'returns conversation from inbox if agent is its member and assignee' do
         params = { inbox_id: restricted_inbox.id }
         create(:inbox_member, user: user_1, inbox: restricted_inbox)
+        assigned_conversation = create(:conversation, account: account, inbox: restricted_inbox, assignee: user_1)
         result = described_class.new(user_1, params).perform
 
-        expect(result[:conversations].map(&:id)).to include(restricted_conversation.id)
+        expect(result[:conversations].map(&:id)).to include(assigned_conversation.id)
       end
 
       it 'does not return conversations from inboxes where agent is not a member' do
@@ -73,7 +74,7 @@ describe ConversationFinder do
       let(:params) { { assignee_type: 'all' } }
 
       it 'filter conversations by assignee type all' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 4
       end
     end
@@ -85,7 +86,7 @@ describe ConversationFinder do
       end
 
       it 'filter conversations by assignee type unassigned' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 1
         expect(result[:conversations]).not_to include(agent_bot_conversation)
       end
@@ -95,7 +96,7 @@ describe ConversationFinder do
       let(:params) { { status: 'all' } }
 
       it 'returns all conversations' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 5
       end
     end
@@ -123,7 +124,7 @@ describe ConversationFinder do
         read_conversation.update!(last_activity_at: 1.minute.from_now)
         unread_conversation.update!(last_activity_at: 2.minutes.from_now)
 
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         conversation_ids = result[:conversations].map(&:id)
 
         expect(conversation_ids).to include(most_unread_conversation.id, unread_conversation.id, read_conversation.id)
@@ -152,7 +153,7 @@ describe ConversationFinder do
         unread_conversation.update!(last_activity_at: 2.minutes.from_now)
         read_conversation.update!(last_activity_at: 1.minute.from_now)
 
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         conversation_ids = result[:conversations].map(&:id)
 
         expect(private_unread_conversation.unread_incoming_messages.count).to eq 2
@@ -168,13 +169,13 @@ describe ConversationFinder do
       end
 
       it 'filter conversations by assignee type assigned' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 4
         expect(result[:conversations]).to include(agent_bot_conversation)
       end
 
       it 'returns the correct meta' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:count]).to eq({
                                        mine_count: 2,
                                        assigned_count: 4,
@@ -190,7 +191,7 @@ describe ConversationFinder do
 
       it 'filter conversations by team' do
         create(:conversation, account: account, inbox: inbox, team: team)
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 1
       end
     end
@@ -211,7 +212,7 @@ describe ConversationFinder do
       let(:params) { { source_id: 'testing_source_id' } }
 
       it 'filter conversations by source id' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 1
       end
     end
@@ -220,7 +221,7 @@ describe ConversationFinder do
       let(:params) { {} }
 
       it 'returns conversations with any source' do
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         expect(result[:conversations].length).to be 4
       end
     end
@@ -239,7 +240,7 @@ describe ConversationFinder do
         conversations[0..27].each do |conversation|
           conversation.update(updated_at: Time.now.utc - 10.seconds)
         end
-        result = conversation_finder.perform
+        result = described_class.new(admin, params).perform
         # pagination is not applied
         # filters are applied
         # modified conversations + 1 conversation created during set up
@@ -263,13 +264,13 @@ describe ConversationFinder do
       let(:params) { { assignee_type: 'assigned' } }
 
       it 'returns only count without conversations' do
-        result = conversation_finder.perform_meta_only
+        result = described_class.new(admin, params).perform_meta_only
         expect(result).to have_key(:count)
         expect(result).not_to have_key(:conversations)
       end
 
       it 'returns the correct counts' do
-        result = conversation_finder.perform_meta_only
+        result = described_class.new(admin, params).perform_meta_only
         expect(result[:count]).to eq({
                                        mine_count: 2,
                                        assigned_count: 3,
@@ -279,8 +280,8 @@ describe ConversationFinder do
       end
 
       it 'returns same counts as perform' do
-        meta_result = conversation_finder.perform_meta_only
-        full_result = conversation_finder.perform
+        meta_result = described_class.new(admin, params).perform_meta_only
+        full_result = described_class.new(admin, params).perform
         expect(meta_result[:count]).to eq(full_result[:count])
       end
     end
@@ -303,7 +304,7 @@ describe ConversationFinder do
       let(:params) { { status: 'open', assignee_type: 'all', conversation_type: 'participating' } }
 
       it 'excludes participating conversations from inboxes the user no longer has access to' do
-        accessible_conversation = create(:conversation, account: account, inbox: inbox)
+        accessible_conversation = create(:conversation, account: account, inbox: inbox, assignee: user_1)
         revoked_conversation = create(:conversation, account: account, inbox: restricted_inbox)
         revoked_membership = create(:inbox_member, user: user_1, inbox: restricted_inbox)
         create(:conversation_participant, user: user_1, conversation: accessible_conversation, account: account)
@@ -316,7 +317,7 @@ describe ConversationFinder do
       end
 
       it 'excludes the inaccessible conversation from the meta counts too' do
-        accessible_conversation = create(:conversation, account: account, inbox: inbox)
+        accessible_conversation = create(:conversation, account: account, inbox: inbox, assignee: user_1)
         revoked_conversation = create(:conversation, account: account, inbox: restricted_inbox)
         revoked_membership = create(:inbox_member, user: user_1, inbox: restricted_inbox)
         create(:conversation_participant, user: user_1, conversation: accessible_conversation, account: account)

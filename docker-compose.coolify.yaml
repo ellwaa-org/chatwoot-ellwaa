@@ -1,0 +1,172 @@
+# Coolify production stack built from this fork, including its Agent visibility changes.
+# One-time setup:
+# 1. Push this file AND your application changes to the repository/branch Coolify uses.
+# 2. Create a Git-based Docker Compose application from that repository and select
+#    docker-compose.coolify.yaml as its Compose file.
+# 3. Set these secrets in the Coolify stack environment (run each command separately):
+#    SECRET_KEY_BASE:      openssl rand -hex 64
+#    POSTGRES_PASSWORD:   openssl rand -hex 32
+#    REDIS_PASSWORD:      openssl rand -hex 32
+#    RUSTFS_ACCESS_KEY:   openssl rand -hex 16
+#    RUSTFS_SECRET_KEY:   openssl rand -hex 32
+# 4. Point the three DNS names to your Coolify server and attach domains in its UI:
+#    chat.company.com    -> rails:3000  (https://chat.company.com:3000)
+#    files.company.com   -> rustfs:9000 (https://files.company.com:9000)
+#    console.company.com -> rustfs:9001 (https://console.company.com:9001)
+#    Put both RustFS domain entries in that service's Domains field.
+#    These ports select the proxy's internal targets; public HTTPS uses port 443.
+#    Coolify's proxy terminates HTTPS; containers speak HTTP internally.
+#    Domain setup: https://next.coolify.io/docs/core/networking/domains
+# 5. Set FRONTEND_URL and STORAGE_ENDPOINT if using different domains (no port suffix).
+#    STORAGE_ENDPOINT must be public HTTPS: browsers follow presigned S3 redirects.
+#    It must also be reachable from the Rails and Sidekiq containers.
+# 6. Deploy in Coolify. Equivalent first run with the same environment available:
+#    docker compose -f docker-compose.coolify.yaml up -d --build
+#    Coolify supplies proxy routing/certificates; Compose alone does not set up HTTPS.
+# Database preparation, RustFS volume permissions, and bucket creation run automatically.
+
+x-chatwoot-base: &chatwoot-base
+  image: chatwoot-ellwaa:latest
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  restart: unless-stopped
+  environment:
+    RAILS_ENV: production
+    NODE_ENV: production
+    INSTALLATION_ENV: docker
+    RAILS_LOG_TO_STDOUT: enabled
+    FORCE_SSL: "true"
+    FRONTEND_URL: ${FRONTEND_URL:-https://chat.company.com}
+    SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_DATABASE: chatwoot
+    POSTGRES_USERNAME: chatwoot
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    REDIS_URL: redis://redis:6379
+    REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ACTIVE_STORAGE_SERVICE: s3_compatible
+    STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-https://files.company.com}
+    STORAGE_BUCKET_NAME: chatwoot
+    STORAGE_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
+    STORAGE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
+    STORAGE_REGION: us-east-1
+    STORAGE_FORCE_PATH_STYLE: "true"
+
+services:
+  prepare:
+    <<: *chatwoot-base
+    restart: "no"
+    entrypoint: docker/entrypoints/rails.sh
+    command: [bundle, exec, rails, db:chatwoot_prepare]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  rails:
+    <<: *chatwoot-base
+    entrypoint: docker/entrypoints/rails.sh
+    command: [bundle, exec, rails, s, -p, "3000", -b, 0.0.0.0]
+    ports:
+      - "3000:3000"
+    depends_on: &chatwoot-dependencies
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      prepare:
+        condition: service_completed_successfully
+      create_bucket:
+        condition: service_completed_successfully
+
+  sidekiq:
+    <<: *chatwoot-base
+    command: [bundle, exec, sidekiq, -C, config/sidekiq.yml]
+    depends_on: *chatwoot-dependencies
+
+  postgres:
+    # Captain migrations require the vector extension.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chatwoot
+      POSTGRES_USER: chatwoot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: [sh, -ec, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rustfs_perms:
+    image: alpine:latest
+    restart: "no"
+    user: "0:0"
+    command: [chown, -R, "10001:10001", /data]
+    volumes:
+      - rustfs_data:/data
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_VOLUMES: /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs_data:/data
+    depends_on:
+      rustfs_perms:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, curl, -fsS, http://127.0.0.1:9000/health]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  create_bucket:
+    image: minio/mc:latest
+    restart: "no"
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        mc alias set local http://rustfs:9000 "$$RUSTFS_ACCESS_KEY" "$$RUSTFS_SECRET_KEY"
+        mc mb --ignore-existing local/chatwoot
+    depends_on:
+      rustfs:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  rustfs_data:
