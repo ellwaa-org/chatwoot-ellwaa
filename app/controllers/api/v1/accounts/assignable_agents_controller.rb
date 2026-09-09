@@ -18,7 +18,8 @@ class Api::V1::Accounts::AssignableAgentsController < Api::V1::Accounts::BaseCon
   private
 
   def fetch_inboxes
-    @inboxes = Current.account.inboxes.find(permitted_params[:inbox_ids])
+    inbox_ids = permitted_params[:inbox_ids]
+    @inboxes = inbox_ids.present? ? Current.account.inboxes.find(inbox_ids) : Current.account.inboxes
   end
 
   def permitted_params
