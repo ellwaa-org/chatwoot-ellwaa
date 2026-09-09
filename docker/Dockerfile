@@ -87,7 +87,8 @@ RUN if [ "$RAILS_ENV" = "production" ]; then \
   fi
 
 # Generate .git_sha file with current commit hash
-RUN git rev-parse HEAD > /app/.git_sha
+# Fall back to "unknown" when the build context has no .git (e.g. Coolify git exports)
+RUN (git rev-parse HEAD 2>/dev/null || echo unknown) > /app/.git_sha
 
 # Remove unnecessary files
 RUN rm -rf /gems/ruby/3.4.0/cache/*.gem \
