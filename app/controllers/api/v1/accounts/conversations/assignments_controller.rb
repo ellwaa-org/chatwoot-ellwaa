@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Conversations::AssignmentsController < Api::V1::Accounts::Conversations::BaseController
+  before_action :check_assignment_authorization, only: [:create]
+
   # assigns agent/team to a conversation
   def create
     if params.key?(:assignee_id) || agent_bot_assignment?
@@ -11,6 +13,10 @@ class Api::V1::Accounts::Conversations::AssignmentsController < Api::V1::Account
   end
 
   private
+
+  def check_assignment_authorization
+    authorize @conversation, :assign?
+  end
 
   def set_agent
     resource = Conversations::AssignmentService.new(

@@ -10,6 +10,7 @@ import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
 import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
+import { getUserRole } from 'dashboard/helper/permissionsHelper';
 
 export default {
   components: {
@@ -65,8 +66,14 @@ export default {
     ...mapGetters({
       currentChat: 'getSelectedChat',
       currentUser: 'getCurrentUser',
+      currentAccountId: 'getCurrentAccountId',
       teams: 'teams/getTeams',
     }),
+    // Assigning/transferring conversations is admin-only; agents only work
+    // what is assigned to them.
+    canAssignConversation() {
+      return getUserRole(this.currentUser, this.currentAccountId) !== 'agent';
+    },
     hasAnAssignedTeam() {
       return !!this.currentChat?.meta?.team;
     },
@@ -229,7 +236,7 @@ export default {
 
 <template>
   <div>
-    <div>
+    <div v-if="canAssignConversation">
       <ContactDetailsItem
         compact
         :title="$t('CONVERSATION_SIDEBAR.ASSIGNEE_LABEL')"
@@ -260,7 +267,7 @@ export default {
         @select="onClickAssignAgent"
       />
     </div>
-    <div>
+    <div v-if="canAssignConversation">
       <ContactDetailsItem
         compact
         :title="$t('CONVERSATION_SIDEBAR.TEAM_LABEL')"

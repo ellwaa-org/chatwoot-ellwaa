@@ -7,6 +7,16 @@ class ConversationPolicy < ApplicationPolicy
     administrator?
   end
 
+  # Assigning/transferring conversations is restricted to administrators and
+  # Enterprise custom roles with the conversation_manage permission; agents
+  # only work conversations assigned to them. Agent bots keep access.
+  def assign?
+    return true if agent_bot?
+    return true if administrator?
+
+    @account_user.permissions.include?('conversation_manage')
+  end
+
   def show?
     administrator? || agent_bot? || agent_can_view_conversation?
   end

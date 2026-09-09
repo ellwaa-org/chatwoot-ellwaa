@@ -8,6 +8,7 @@ import { useMapGetter } from 'dashboard/composables/store';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
+import { getUserRole } from 'dashboard/helper/permissionsHelper';
 
 const props = defineProps({
   selectedInboxes: {
@@ -33,6 +34,13 @@ const assignableAgentsUiFlags = useMapGetter(
   'inboxAssignableAgents/getUIFlags'
 );
 const bulkActionsUiFlags = useMapGetter('bulkActions/getUIFlags');
+const currentUser = useMapGetter('getCurrentUser');
+const accountId = useMapGetter('getCurrentAccountId');
+
+// Bulk assignment is admin-only; agents only work what is assigned to them.
+const canAssign = computed(
+  () => getUserRole(currentUser.value, accountId.value) !== 'agent'
+);
 
 const isLoading = computed(() => assignableAgentsUiFlags.value.isFetching);
 const isUpdating = computed(() => bulkActionsUiFlags.value.isUpdating);
@@ -111,7 +119,7 @@ const handleToggleDropdown = () => {
 </script>
 
 <template>
-  <div ref="containerRef" class="relative">
+  <div v-if="canAssign" ref="containerRef" class="relative">
     <Button
       v-tooltip="$t('BULK_ACTION.ASSIGN_AGENT_TOOLTIP')"
       icon="i-lucide-user-round-check"

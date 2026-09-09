@@ -20,11 +20,18 @@ class Api::V1::Accounts::BulkActionsController < Api::V1::Accounts::BaseControll
   end
 
   def enqueue_conversation_job
+    authorize :conversation, :assign? if bulk_assignment?
     ::BulkActionsJob.perform_later(
       account: @current_account,
       user: current_user,
       params: conversation_params
     )
+  end
+
+  def bulk_assignment?
+    Array(params[:fields]).any? do |field|
+      field.respond_to?(:key?) && (field.key?(:assignee_id) || field.key?(:team_id))
+    end
   end
 
   def enqueue_contact_job

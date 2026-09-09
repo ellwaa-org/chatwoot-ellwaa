@@ -139,6 +139,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
 
     context 'when conversation already has an assignee' do
       let(:agent) { create(:user, account: account, role: :agent) }
+      let(:administrator) { create(:user, account: account, role: :administrator) }
 
       before do
         create(:inbox_member, inbox: conversation.inbox, user: agent)
@@ -149,7 +150,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         params = { assignee_id: nil }
         post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
              params: params,
-             headers: agent.create_new_auth_token,
+             headers: administrator.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
@@ -157,12 +158,24 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         expect(Conversations::ActivityMessageJob)
           .to(have_been_enqueued.at_least(:once)
         .with(conversation, { account_id: conversation.account_id, inbox_id: conversation.inbox_id, message_type: :activity,
-                              content: "Conversation unassigned by #{agent.name}" }))
+                              content: "Conversation unassigned by #{administrator.name}" }))
+      end
+
+      it 'does not allow agents to unassign the conversation' do
+        params = { assignee_id: nil }
+        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: params,
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(conversation.reload.assignee).to eq(agent)
       end
     end
 
     context 'when conversation already has a team' do
       let(:agent) { create(:user, account: account, role: :agent) }
+      let(:administrator) { create(:user, account: account, role: :administrator) }
       let(:team) { create(:team, account: account) }
 
       before do
@@ -174,7 +187,7 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         params = { team_id: 0 }
         post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
              params: params,
-             headers: agent.create_new_auth_token,
+             headers: administrator.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
